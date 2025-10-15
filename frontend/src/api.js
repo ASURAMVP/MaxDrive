@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || 'http://localhost:4000/api'
+  baseURL: import.meta.env.VITE_API_BASE || 'https://megamax.onrender.com'
 });
 
 export async function requestUploadUrl({ filename, contentType, size, userId }) {
