@@ -6,3 +6,5 @@ This repository contains a minimal starter for MEGA MAX: frontend (React), backe
 1. Create a local dir and paste this repo structure into it.
 2. Copy `.env.example` to `.env` and set variables.
 3. From `infra/` run:
+4. Backend: http://localhost:4000
+Frontend: http://localhost:3000
