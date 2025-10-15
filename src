@@ -1,1 +1,130 @@
+/**
+ * Minimal Express backend for MEGA MAX starter
+ * - Presigned POST generation for S3 uploads
+ * - Simple files metadata endpoints
+ *
+ * Security note: This starter is for local development/demo only.
+ * In production add auth, rate-limits, virus scanning, logging, monitoring.
+ */
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const { Pool } = require('pg');
+const { createPresignedPost } = require('@aws-sdk/s3-presigned-post');
+const { S3Client } = require('@aws-sdk/client-s3');
+
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
+const s3Client = new S3Client({ region: process.env.AWS_REGION });
+
+async function generatePresignedPost(key, maxSizeBytes = 50 * 1024 * 1024 * 1024) {
+  const params = {
+    Bucket: process.env.S3_BUCKET,
+    Key: key,
+    Conditions: [
+      ['content-length-range', 0, maxSizeBytes]
+    ],
+    Expires: 600 // seconds
+  };
+  return await createPresignedPost(s3Client, params, { expiresIn: 600 });
+}
+
+// create tables if not exist (simple bootstrap)
+async function bootstrap() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT,
+    plan TEXT DEFAULT 'free',
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS files (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    name TEXT,
+    content_type TEXT,
+    size BIGINT DEFAULT 0,
+    visibility TEXT DEFAULT 'private',
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
+}
+// run bootstrap
+bootstrap().catch(console.error);
+
+// Create presigned upload POST
+app.post('/api/upload-url', async (req, res) => {
+  try {
+    const { filename, contentType, size, userId } = req.body;
+    if (!filename) return res.status(400).json({ error: 'filename required' });
+
+    const key = `uploads/${userId || 'demo-user'}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${filename}`;
+    const presigned = await generatePresignedPost(key);
+
+    // create metadata placeholder (size may be 0 until client confirms)
+    const q = `INSERT INTO files(user_id, key, name, content_type, size, created_at)
+               VALUES($1,$2,$3,$4,$5,NOW()) RETURNING id, created_at`;
+    const r = await pool.query(q, [userId || 'demo-user', key, filename, contentType || null, size || 0]);
+    const uploadId = r.rows[0].id;
+
+    res.json({
+      uploadId,
+      key,
+      url: presigned.url,
+      fields: presigned.fields
+    });
+  } catch (err) {
+    console.error('upload-url error', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Confirm upload (client calls after successful upload to S3)
+app.post('/api/confirm-upload', async (req, res) => {
+  try {
+    const { uploadId, size } = req.body;
+    if (!uploadId) return res.status(400).json({ error: 'uploadId required' });
+    await pool.query('UPDATE files SET size = $1 WHERE id = $2', [size || 0, uploadId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('confirm-upload error', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// List files (latest first)
+app.get('/api/files', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT id, user_id, name, key, size, created_at FROM files ORDER BY created_at DESC LIMIT 200');
+    res.json(r.rows);
+  } catch (err) {
+    console.error('files list error', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+// Delete file metadata (does not delete object from S3; add lifecycle or object deletion API separately)
+app.delete('/api/files/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await pool.query('DELETE FROM files WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('delete file', err);
+    res.status(500).json({ error: 'server error' });
+  }
+});
+
+const port = process.env.PORT || 4000;
+app.listen(port, () => {
+  console.log(`MEGA MAX backend listening on ${port}`);
+});
 
