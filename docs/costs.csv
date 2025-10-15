@@ -1,0 +1,6 @@
+scenario,storage_tb,storage_gb,estimated_price_per_gb_usd,monthly_cost_usd,yearly_cost_usd,notes
+1-user-5kTB,5000,5120000,0.021,107520.00,1290240.00,"Estimate: 5,000 TB per user at $0.021/GB/mo"
+1-user-1TB,1,1024,0.021,21.50,258.00,"1 TB example"
+100-users-1TB-each,100,102400,0.021,2145.00,25740.00,"100 users with 1 TB each"
+1PB-platform,1024,1048576,0.021,22019.00,264228.00,"1 PB total"
+5PB-platform,5120,5242880,0.021,110016.00,1320192.00,"5 PB total"
