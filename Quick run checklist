@@ -1,0 +1,9 @@
+# from a parent folder create structure
+mkdir mega-max && cd mega-max
+# create infra folder and paste docker-compose.yml and .env examples as above
+# place backend and frontend folders as above
+
+# then run (from infra/)
+docker-compose up --build
+# frontend at http://localhost:3000
+# backend at http://localhost:4000
