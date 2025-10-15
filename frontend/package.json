@@ -12,7 +12,7 @@
     "react-dom": "^18.2.0",
     "axios": "^1.4.0"
   },
-  "devDependencies": {npm install --save-dev @vitejs/plugin-react
+  "devDependencies": {
     
     "vite": "^4.0.0",
     "tailwindcss": "^4.1.14",
